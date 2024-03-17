@@ -1,47 +1,97 @@
-use axum::{extract::State, http::StatusCode, routing::post, Json, Router};
-use serde_json::json;
-
-use crate::{
-    model::{self, users::User},
-    turso,
+use axum::{
+    body::Body,
+    extract::State,
+    http::{Response, StatusCode},
+    response::IntoResponse,
+    Json,
 };
+use tower_cookies::{cookie::time::Duration, Cookie, Cookies};
+use tracing::{error, info, instrument, warn};
 
-pub fn merge_routes(db_connection: turso::SyncDbConnection) -> axum::Router {
-    Router::new()
-        .route("/user", post(register_user).get(|| async { "AAA" }))
-        .with_state(db_connection)
+use crate::{models::User, state::AppStateManager};
+
+#[derive(Debug, serde::Deserialize)]
+pub struct LoginCredentials {
+    pub email: String,
+    pub password: String,
 }
 
 #[axum::debug_handler]
-async fn register_user(
-    State(state): State<turso::SyncDbConnection>,
-) -> (StatusCode, Json<serde_json::Value>) {
-    println!("REGISTER USER");
+#[instrument(skip(), name = "Logging in a new user")]
+pub async fn login_user(// State(state): State<AppStateSend>,
+    // Json(credentials): Json<LoginCredentials>,
+) -> impl IntoResponse {
+    Response::builder()
+        .status(200)
+        .header("Authed", "true")
+        .body(Body::from("AAAA"))
+        .unwrap()
+}
 
-    let conn = state.clone();
-    let conn = conn.read().await;
+#[derive(Debug, serde::Deserialize)]
+pub struct RegisterCredentials {
+    pub name: String,
+    pub password: String,
+    pub email: String,
+}
 
-    let user = User::new("Supa".into(), "supa@email.com".into(), "password".into());
+#[axum::debug_handler]
+#[instrument(skip(state, credentials, cookies), name = "Creating a new user", fields(usr_name = %credentials.name))]
+pub async fn register_user(
+    cookies: Cookies,
+    State(state): State<AppStateManager>,
+    Json(credentials): Json<RegisterCredentials>,
+) -> impl IntoResponse {
+    let inner_state = state.clone();
+    let db_con = inner_state.db_con();
 
-    let result = model::users::create_user(&conn, &user).await;
+    let user = User::new(credentials.name, credentials.email, credentials.password);
+    let id_preped = libsql::Value::Blob(user.id().to_bytes_le().to_vec());
 
-    match result {
-        Ok(_) => (
-            StatusCode::OK,
-            json!({
-                "id" : user.id(),
-            })
-            .into(),
-        ),
-        Err(err) => {
-            println!("Err: {err}");
-            (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                json!({
-                    "reason": err.to_string()
-                })
-                .into(),
-            )
-        }
+    let mut prep_stmt = db_con
+        .prepare("insert into user (id, name, email, password) values (?1, ?2, ?3, ?4)")
+        .await
+        .expect("failed to prepare statement");
+
+    let res = prep_stmt
+        .execute((
+            id_preped,
+            user.name().to_owned(),
+            user.email().to_owned(),
+            user.password().to_owned(),
+        ))
+        .await;
+
+    if res.is_err() {
+        error!("Error creatting user: {}>", res.unwrap_err());
+
+        return Response::builder()
+            .status(StatusCode::INTERNAL_SERVER_ERROR)
+            .body(Body::from("Could not register user"))
+            .unwrap();
     }
+
+    info!("New user created <{}>", user.name());
+
+    let session_res = state.create_new_session(&user).await;
+    if session_res.is_err() {
+        warn!(
+            "Could not create user session: {}",
+            session_res.unwrap_err()
+        );
+
+        return Response::builder()
+            .status(StatusCode::EXPECTATION_FAILED)
+            .body(Body::empty())
+            .unwrap();
+    };
+    let session_id = session_res.unwrap();
+
+    let expires_offset = Duration::new(60 * 45, 0);
+    AppStateManager::create_session_cookie(&cookies, session_id, expires_offset);
+
+    Response::builder()
+        .status(StatusCode::OK)
+        .body(Body::empty())
+        .unwrap()
 }
