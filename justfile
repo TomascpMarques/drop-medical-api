@@ -1,13 +1,12 @@
-turso-migrate-db:
-  turso db shell peaceful-mauler < database/schemas/main.sql
+init-db:
+  bash ./database/scripts/init_db.sh
 
-turso-dump-db:
-  turso db shell peaceful-mauler .dump > database/schemas/main.sql
+clean-db:
+  docker stop dropmedical_pg; \
+  docker rm dropmedical_pg;
 
-turso-load-dump: turso-dump-db
-  turso db shell peaceful-mauler < database/schemas/main.sql
-
-
+migrate-db:
+  sqlx migrate run --source database/migration  
 
 run-prod:
   export APP_ENV=production && cargo r

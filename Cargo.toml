@@ -40,3 +40,4 @@ tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
 libsql = "0.3.1"
 async-trait = "0.1.78"
 tower-sessions = "0.11.1"
+sqlx = { version = "0.7.4", features = ["postgres", "runtime-tokio-rustls", "uuid"] }
