@@ -2,4 +2,4 @@
 host = "0.0.0.0"
 
 [database]
-uri = "libsql://peaceful-mauler-tomascpmarques.turso.io"
+uri = "postgresql://postgres:password@localhost/dropmedical"

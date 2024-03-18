@@ -3,4 +3,4 @@ host = "127.0.0.1"
 port = 8080
 
 [database]
-uri = "database/instances/local.db"
+uri = "postgres://postgres:password@localhost:2345/main"
