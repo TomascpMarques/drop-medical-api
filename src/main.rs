@@ -1,16 +1,13 @@
-use axum::{
-    routing::{get, post},
-    Router,
-};
+use axum::{routing::post, Router};
 use tower_cookies::CookieManagerLayer;
 use tower_http::trace::{self, TraceLayer};
 use tracing::{info, Level};
 
 mod api;
 mod configuration;
+mod database;
 mod models;
 mod state;
-mod turso;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -27,16 +24,15 @@ async fn main() -> anyhow::Result<()> {
     let config = configuration::get_config()?;
 
     // DB setup
-    let data_base = turso::setup_turso(&config)
+    let db_pool = database::setup_db(&config)
         .await
         .expect("Failed to build DB");
 
-    let db_conn = data_base.connect().expect("Failed to connect to DB");
-    let state = state::AppStateManager::new(db_conn.clone());
+    let state = state::AppStateManager::new(db_pool);
 
     let app = Router::new()
         .route("/api/user/register", post(api::register_user))
-        .route("/aaaa", get(|| async { "AAA" }))
+        .route("/api/user/login", post(api::login_user))
         // App State layer
         .with_state(state)
         // Add cookie support

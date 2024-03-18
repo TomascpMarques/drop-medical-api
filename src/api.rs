@@ -5,7 +5,8 @@ use axum::{
     response::IntoResponse,
     Json,
 };
-use tower_cookies::{cookie::time::Duration, Cookie, Cookies};
+use sqlx::Row;
+use tower_cookies::{cookie::time::Duration, Cookies};
 use tracing::{error, info, instrument, warn};
 
 use crate::{models::User, state::AppStateManager};
@@ -42,34 +43,28 @@ pub async fn register_user(
     State(state): State<AppStateManager>,
     Json(credentials): Json<RegisterCredentials>,
 ) -> impl IntoResponse {
-    let inner_state = state.clone();
-    let db_con = inner_state.db_con();
-
     let user = User::new(credentials.name, credentials.email, credentials.password);
-    let id_preped = libsql::Value::Blob(user.id().to_bytes_le().to_vec());
 
-    let mut prep_stmt = db_con
-        .prepare("insert into user (id, name, email, password) values (?1, ?2, ?3, ?4)")
-        .await
-        .expect("failed to prepare statement");
+    let prep_stmt = sqlx::query!(
+        r#"insert into "user" (name, email, password) values ($1, $2, $3)"#,
+        user.name(),
+        user.email(),
+        user.password()
+    )
+    .execute(state.db_pool())
+    .await;
 
-    let res = prep_stmt
-        .execute((
-            id_preped,
-            user.name().to_owned(),
-            user.email().to_owned(),
-            user.password().to_owned(),
-        ))
-        .await;
+    match prep_stmt {
+        Ok(_) => (),
+        Err(e) => {
+            error!("error creatting user: {}>", e);
 
-    if res.is_err() {
-        error!("Error creatting user: {}>", res.unwrap_err());
-
-        return Response::builder()
-            .status(StatusCode::INTERNAL_SERVER_ERROR)
-            .body(Body::from("Could not register user"))
-            .unwrap();
-    }
+            return Response::builder()
+                .status(StatusCode::INTERNAL_SERVER_ERROR)
+                .body(Body::from("could not register user"))
+                .unwrap();
+        }
+    };
 
     info!("New user created <{}>", user.name());
 
@@ -85,8 +80,8 @@ pub async fn register_user(
             .body(Body::empty())
             .unwrap();
     };
-    let session_id = session_res.unwrap();
 
+    let session_id = session_res.unwrap();
     let expires_offset = Duration::new(60 * 45, 0);
     AppStateManager::create_session_cookie(&cookies, session_id, expires_offset);
 

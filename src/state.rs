@@ -3,17 +3,16 @@ use tower_cookies::{
     cookie::time::{Duration, OffsetDateTime},
     Cookie, Cookies,
 };
-use uuid::NoContext;
 
 #[derive(Clone, getset::Getters)]
 #[getset(get = "pub")]
 pub struct AppStateManager {
-    db_con: libsql::Connection,
+    db_pool: sqlx::postgres::PgPool,
 }
 
 impl AppStateManager {
-    pub fn new(db_con: libsql::Connection) -> Self {
-        Self { db_con }
+    pub fn new(db_con: sqlx::postgres::PgPool) -> Self {
+        Self { db_pool: db_con }
     }
 }
 
@@ -34,24 +33,18 @@ impl AppStateManager {
         cookies.add(cookie);
     }
 
-    pub async fn create_new_session(&self, user: &User) -> Result<uuid::Uuid, libsql::Error> {
-        let ts = uuid::Timestamp::now(NoContext);
-        let session_id = uuid::Uuid::new_v7(ts);
+    pub async fn create_new_session(&self, user: &User) -> Result<uuid::Uuid, sqlx::Error> {
+        let session_id = uuid::Uuid::new_v4();
 
         let expiration_time = chrono::Utc::now().to_rfc3339();
 
-        let mut preped_stmt = self
-            .db_con
-            .prepare(r#"INSERT INTO user_session (id, user_id, expires_in) values (?1, ?2, ?3)"#)
-            .await?;
-
-        preped_stmt
-            .execute((
-                session_id.to_bytes_le().to_vec(),
-                user.id().to_bytes_le().to_vec(),
-                expiration_time,
-            ))
-            .await?;
+        sqlx::query!(
+            r#"INSERT INTO "user_session" (user_id, expires_in) VALUES ($1, $2)"#,
+            user.id(),
+            expiration_time,
+        )
+        .execute(&self.db_pool)
+        .await?;
 
         Ok(session_id)
     }

@@ -1,5 +1,3 @@
-use uuid::{NoContext, Timestamp};
-
 #[derive(Debug, serde::Deserialize, serde::Serialize, getset::Getters)]
 #[getset(get = "pub")]
 pub struct User {
@@ -11,9 +9,7 @@ pub struct User {
 
 impl User {
     pub fn new(name: String, email: String, password: String) -> Self {
-        let ts = Timestamp::now(NoContext);
-        let id = uuid::Uuid::new_v7(ts);
-
+        let id = uuid::Uuid::new_v4();
         Self {
             id,
             name,
