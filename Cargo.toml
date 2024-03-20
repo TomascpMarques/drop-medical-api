@@ -12,9 +12,8 @@ thiserror = "1.0.58"
 
 axum = { version = "0.7.4", features = ["macros"] }
 http-body-util = "0.1.1"
-jsonwebtoken = "9.2.0"
 
-chrono = { version = "0.4.35", features = ["serde"] }
+chrono = { version = "0.4.35", features = ["serde", "alloc"] }
 uuid = { version = "1.7.0", features = ["v7", "serde"] }
 
 config = "0.14.0"
@@ -37,7 +36,11 @@ tower-http = { version = "0.5.2", features = ["trace"] }
 tracing = { version = "0.1.40", features = ["attributes"] }
 tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
 
-libsql = "0.3.1"
 async-trait = "0.1.78"
-tower-sessions = "0.11.1"
-sqlx = { version = "0.7.4", features = ["postgres", "runtime-tokio-rustls", "uuid"] }
+sqlx = { version = "0.7.4", features = [
+  "postgres",
+  "runtime-tokio-rustls",
+  "uuid",
+  "time",
+  "chrono",
+] }
