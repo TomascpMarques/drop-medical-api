@@ -7,6 +7,7 @@ mod api;
 mod configuration;
 mod database;
 mod models;
+mod sessions;
 mod state;
 
 #[tokio::main]
@@ -31,8 +32,8 @@ async fn main() -> anyhow::Result<()> {
     let state = state::AppStateManager::new(db_pool);
 
     let app = Router::new()
-        .route("/api/user/register", post(api::register_user))
-        .route("/api/user/login", post(api::login_user))
+        // .route("/api/user/register", post(api::register_user))
+        // .route("/api/user/login", post(api::login_user))
         // App State layer
         .with_state(state)
         // Add cookie support
