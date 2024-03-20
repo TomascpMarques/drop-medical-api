@@ -1,32 +1,34 @@
 use axum::{
-    body::Body,
-    extract::State,
-    http::{Response, StatusCode},
-    response::IntoResponse,
-    Json,
+    body::Body, extract::State, http::{Response, StatusCode}, response::IntoResponse, routing::post, Json, Router
 };
 use tower_cookies::{cookie::time::Duration, Cookies};
 use tracing::{error, info, instrument, warn};
 
-use crate::{models::User, sessions::SessionManager, state::AppStateManager};
+use crate::{models::users::User, sessions::SessionManager, state::AppStateManager};
 
+pub fn merge_routes(app_state: AppStateManager) -> Router {
+    Router::new()
+        .route("/login", post(login_user))
+        .route("/register", post(register_user))
+        .with_state(app_state)
+}
 
 #[derive(Debug, serde::Deserialize)]
-pub struct LoginCredentials {
+struct LoginCredentials {
     pub email: String,
     pub password: String,
 }
 
 #[axum::debug_handler]
 #[instrument(
-    skip(state, credentials), 
+    skip(_state, credentials), 
     name = "Logging in a user",
     fields(
         usr_name = %credentials.email
     )
 )]
-pub async fn login_user(
-    State(state): State<AppStateManager>,
+async fn login_user(
+    State(_state): State<AppStateManager>,
     Json(credentials): Json<LoginCredentials>,
 ) -> impl IntoResponse {
     // TODO finish auth system
@@ -37,7 +39,7 @@ pub async fn login_user(
 }
 
 #[derive(Debug, serde::Deserialize)]
-pub struct RegisterCredentials {
+struct RegisterCredentials {
     pub name: String,
     pub password: String,
     pub email: String,
@@ -49,7 +51,7 @@ pub struct RegisterCredentials {
     name = "Creating a new user", 
     fields(usr_name = %credentials.name)
 )]
-pub async fn register_user(
+async fn register_user(
     cookies: Cookies,
     State(state): State<AppStateManager>,
     Json(credentials): Json<RegisterCredentials>,

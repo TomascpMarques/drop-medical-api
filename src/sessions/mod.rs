@@ -1,8 +1,9 @@
-use crate::models::{User, UserSession};
 use tower_cookies::{
     cookie::time::{Duration, OffsetDateTime},
     Cookie, Cookies,
 };
+
+use crate::models::users::{User, UserSession};
 
 mod axum_impls;
 

@@ -10,3 +10,11 @@ pub async fn setup_db(config: &Settings) -> Result<sqlx::PgPool, sqlx::Error> {
         Environment::Production => pg_pool_options.connect_lazy(db_uri),
     }
 }
+
+pub fn connection_str_without_db(config: &Settings) -> String {
+    let db_uri = config.database().uri();
+    let x = db_uri.split_inclusive('/').into_iter();
+    let x = x.last().unwrap();
+    let x = db_uri.replace(x, "");
+    x.to_string()
+}
