@@ -4,6 +4,18 @@ version = "0.1.0"
 edition = "2021"
 authors = ["Tomás Marques <tomascpmarques@gmail.com>"]
 
+[lib]
+path = "src/lib.rs"
+
+[[bin]]
+path = "src/main.rs"
+name = "dropmedical"
+
+[profile.dev.package.sqlx-macros]
+opt-level = 3
+
+[dev-dependencies]
+reqwest = "0.11.24"
 
 [dependencies]
 anyhow = "1.0.81"
@@ -14,7 +26,7 @@ axum = { version = "0.7.4", features = ["macros"] }
 http-body-util = "0.1.1"
 
 chrono = { version = "0.4.35", features = ["serde", "alloc"] }
-uuid = { version = "1.7.0", features = ["v7", "serde"] }
+uuid = { version = "1.7.0", features = ["v7", "serde", "v4"] }
 
 config = "0.14.0"
 dotenvy = "0.15.7"

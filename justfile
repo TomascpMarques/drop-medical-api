@@ -1,21 +1,32 @@
+# Start the Postgre docker container
 init-db:
   bash ./database/scripts/init_db.sh
 
+# Stop and remove the Postgre docker container
 clean-db:
   docker stop dropmedical_pg; \
   docker rm dropmedical_pg;
 
+# Resume (must exist) the Postgre container
 resume-db:
   docker start dropmedical_pg
 
+# Run migrations using sqlx (local)
 migrate-db:
-  sqlx migrate run --source database/migration  
+  cargo sqlx migrate run --source database/migrations
 
+# Create a new migration with the given name
+migrate-new MIGRATION_NAME:
+  cargo sqlx migrate add --source ./database/migrations {{MIGRATION_NAME}}
+
+# Prepare the off-line support for sqlx queries 
 sqlx-prepare:
   cargo sqlx prepare -- --workspace
 
+# Run the web-app in local mode
 run-prod:
   export APP_ENV=production && cargo r
 
+# Run the web-app in production mode
 run-local:
   export APP_ENV=local && cargo r
