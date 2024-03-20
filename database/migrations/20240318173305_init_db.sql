@@ -9,7 +9,7 @@ create table if not exists "user" (
 create table if not exists "user_session" (
   id uuid default gen_random_uuid(),
   user_id uuid not null unique,
-  expires_in text not null,
+  expires_in TIMESTAMPTZ not null,
   PRIMARY KEY(id),
   constraint fk_user_id
     FOREIGN KEY(user_id) 

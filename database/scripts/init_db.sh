@@ -68,5 +68,5 @@ sqlx migrate run --source database/migrations
 >&2 echo "Postgres migrations were done, ready to go!"
 
 # SQLX prepare offline query syntax
-#cargo sqlx prepare -- --tests
-# >&2 echo "Run sqlx prepare"
+cargo sqlx prepare -- --tests
+>&2 echo "Run sqlx prepare"
