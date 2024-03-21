@@ -1,7 +1,7 @@
 create table if not exists "user" (
   id uuid default gen_random_uuid(),
-  name Text not null,
-  email Text not null UNIQUE,
+  name varchar(40) not null,
+  email varchar(40) not null UNIQUE,
   password Text not null,
   PRIMARY KEY(id)
 );

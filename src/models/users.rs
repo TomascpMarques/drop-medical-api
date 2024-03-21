@@ -2,10 +2,10 @@
 #[getset(get = "pub")]
 pub struct User {
     #[getset(get_mut = "pub")]
-    id: Option<uuid::Uuid>,
-    name: String,
-    email: String,
-    password: String,
+    pub id: Option<uuid::Uuid>,
+    pub name: String,
+    pub email: String,
+    pub password: String,
 }
 
 impl User {
@@ -30,8 +30,8 @@ where
     serializer.serialize_str(retn.as_str())
 }
 
-#[derive(Debug, serde::Deserialize, serde::Serialize, getset::Getters)]
-#[getset(get = "pub")]
+#[derive(Debug, serde::Deserialize, serde::Serialize, getset::Getters, getset::Setters)]
+#[getset(get = "pub", set)]
 pub struct UserSession {
     pub id: uuid::Uuid,
     pub user_id: uuid::Uuid,
@@ -50,5 +50,10 @@ impl UserSession {
             user_id,
             expires_in,
         }
+    }
+
+    pub fn extend_session(&mut self, duration: Option<std::time::Duration>) {
+        let duration = duration.unwrap_or(std::time::Duration::from_secs(60 * 20));
+        self.expires_in += duration;
     }
 }

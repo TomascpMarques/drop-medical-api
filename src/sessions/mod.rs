@@ -1,22 +1,45 @@
+use sqlx::types::chrono;
 use tower_cookies::{
     cookie::time::{Duration, OffsetDateTime},
     Cookie, Cookies,
 };
+use tracing::{info, warn};
 
 use crate::models::users::{User, UserSession};
 
+pub mod auth;
+/// All axum trait implementation, for a session struct, is located in this file.
 mod axum_impls;
 
 pub const SESSION_COOKIE_NAME: &'static str = "SESSION";
 
+pub type Result<T> = std::result::Result<T, SessionError>;
+
+/// # About
+/// Custom impl of a session manager using cookies to keep track of the session in the client-side,
+/// and in de server side using a Postgre instance.
 #[derive(Clone, Copy, Default)]
 pub struct SessionManager;
 
+#[derive(Debug, thiserror::Error)]
+pub enum SessionError {
+    #[error("Nao existe sessão para este Uuid")]
+    NoSessionForGivenId,
+    #[error("Falha ao criar sessão")]
+    FailedToCreateSession,
+    #[error("Erro ao tentar extender a sessão do utilizador")]
+    FailedToExtendUserSession,
+    #[error("Erro ao tentar excluir a sessão do utilizador")]
+    FailedToDeleteUserSession,
+    #[error("Sessão já existente para este utilizador")]
+    AlreadyExistingSession,
+}
+
 impl SessionManager {
     pub async fn create_new_session(
-        pg_con: &sqlx::postgres::PgPool,
+        pg_pool: &sqlx::postgres::PgPool,
         user: &User,
-    ) -> Result<uuid::Uuid, sqlx::Error> {
+    ) -> Result<uuid::Uuid> {
         let expiration_time = chrono::Utc::now();
 
         let query_result = sqlx::query!(
@@ -24,10 +47,49 @@ impl SessionManager {
             user.id().unwrap(),
             expiration_time,
         )
-        .fetch_one(pg_con)
-        .await?;
+        .fetch_one(pg_pool)
+        .await;
 
-        Ok(query_result.id)
+        if query_result.is_ok() {
+            return Ok(query_result.unwrap().id);
+        }
+
+        match query_result.unwrap_err() {
+            sqlx::Error::Database(err) if err.is_unique_violation() => {
+                // Need to create_new_session
+                info!("Creating new session");
+                Self::drop_session(pg_pool, user.id().unwrap()).await?;
+
+                let query_result = sqlx::query!(
+                    r#"INSERT INTO "user_session" (user_id, expires_in) VALUES ($1, $2) RETURNING id"#,
+                    user.id().unwrap(),
+                    expiration_time,
+                )
+                .fetch_one(pg_pool)
+                .await.expect("Should not fail to create this session");
+
+                Ok(query_result.id)
+            }
+            e => {
+                warn!("Possible db error: {e}");
+                Err(SessionError::FailedToCreateSession)
+            }
+        }
+    }
+
+    pub async fn drop_session(pg_pool: &sqlx::postgres::PgPool, user_id: uuid::Uuid) -> Result<()> {
+        let query_result =
+            sqlx::query!(r#"DELETE FROM "user_session" where user_id = $1;"#, user_id,)
+                .execute(pg_pool)
+                .await;
+
+        match query_result {
+            Ok(_) => Ok(()),
+            Err(e) => {
+                warn!("Possible error: {e}");
+                Err(SessionError::FailedToDeleteUserSession)
+            }
+        }
     }
 
     pub fn create_session_cookie<'a>(
@@ -47,20 +109,59 @@ impl SessionManager {
         cookies.add(cookie);
     }
 
-    pub async fn _check_session_exists(
+    async fn check_valid_session(
         pg_pool: &sqlx::postgres::PgPool,
         session_id: uuid::Uuid,
-    ) -> Result<bool, sqlx::Error> {
-        _ = sqlx::query_as!(
+    ) -> Result<bool> {
+        let user_sesh = sqlx::query_as!(
             UserSession,
-            r#"select * from user_session where id = $1"#,
+            r#"SELECT * FROM user_session WHERE id = $1"#,
             session_id
         )
         .fetch_one(pg_pool)
-        .await?;
+        .await
+        .map_err(|err| {
+            warn!("Possible DB error: {err}");
+            SessionError::NoSessionForGivenId
+        })?;
+
+        if &chrono::Utc::now() > user_sesh.expires_in() {
+            sqlx::query!(
+                r#"DELETE FROM "user_session" where user_id = $1;"#,
+                user_sesh.id(),
+            )
+            .execute(pg_pool)
+            .await
+            .map_err(|err| {
+                warn!("Possible DB error: {err}");
+                SessionError::FailedToDeleteUserSession
+            })?;
+
+            return Ok(false);
+        }
+
+        // Defaults to 20 more minutes in current session
+        // user_sesh.extend_session(None);
+
+        // sqlx::query!(
+        //     r#"UPDATE "user_session" set expires_in = $1 where user_id = $2;"#,
+        //     user_sesh.expires_in(),
+        //     user_sesh.id(),
+        // )
+        // .execute(pg_pool)
+        // .await
+        // .map_err(|err| {
+        //     warn!("Possible DB error: {err}");
+        //     SessionError::FailedToExtendUserSession
+        // })?;
 
         Ok(true)
     }
 }
 
+/// UserSessionIdExtractor
+/// # About
+/// Extract the session id _([Uuid](uuid::Uuid) v4 value)_ from the session cookie.
+/// To achieve this it implements the trait [FromRequestParts](axum::extract::FromRequestParts)
+/// from the axum crate;
 struct UserSessionIdExtractor(uuid::Uuid);

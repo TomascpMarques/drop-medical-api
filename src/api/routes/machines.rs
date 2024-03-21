@@ -18,7 +18,9 @@ pub fn merge_routes(app_state: AppStateManager) -> Router {
 
 #[derive(Debug, serde::Deserialize)]
 struct RegisterDrooper {
+    #[serde(rename(deserialize = "owid"))]
     owner_id: uuid::Uuid,
+    #[serde(rename(deserialize = "n"))]
     name: String,
 }
 
@@ -28,13 +30,6 @@ async fn register_dropper(
     State(state): State<AppStateManager>,
     Form(dropper): Form<RegisterDrooper>,
 ) -> Result<impl IntoResponse, DropperRouteResult> {
-    /*
-     * 1. Receber dados para registar
-     * 2. Criar novo dropper, desativado e sem url de maquina
-     * 3. Dropper sem medicamentos e schedules
-     * */
-
-    // Temos de criar o dropper, usar o metodo new da struct Dropper
     let new_dropper = Dropper::new(state.db_pool(), false, dropper.owner_id, None, dropper.name)
         .await
         .map_err(|err| DropperRouteResult::FalhaAoRegistarDropper(err))?;

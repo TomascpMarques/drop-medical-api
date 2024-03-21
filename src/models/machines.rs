@@ -19,7 +19,7 @@ impl Dropper {
     ) -> Result<Self, sqlx::Error> {
         let mut dropper = Self {
             id: 0,
-            serial_id: uuid::Uuid::new_v4(),
+            serial_id: uuid::Uuid::default(),
             active,
             owner_id,
             machine_url,

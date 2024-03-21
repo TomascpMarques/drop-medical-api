@@ -20,7 +20,7 @@ async fn main() -> anyhow::Result<()> {
         .await
         .expect("Failed to build DB");
 
-    let app = setup_app_router(db_pool)?;
+    let app = setup_app_router(&db_pool)?;
 
     let address = format!(
         "{}:{}",

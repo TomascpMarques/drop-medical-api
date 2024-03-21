@@ -10,8 +10,8 @@ mod models;
 mod sessions;
 mod state;
 
-pub fn setup_app_router(db_pool: sqlx::postgres::PgPool) -> anyhow::Result<Router> {
-    let state = state::AppStateManager::new(db_pool);
+pub fn setup_app_router(db_pool: &sqlx::postgres::PgPool) -> anyhow::Result<Router> {
+    let state = state::AppStateManager::new(db_pool.clone());
 
     let app = Router::new()
         .nest("/api", api::routes::merge_routes(state.clone()))
