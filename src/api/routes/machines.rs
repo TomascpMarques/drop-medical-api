@@ -2,17 +2,24 @@ use axum::{
     body::Body,
     extract::State,
     http::StatusCode,
+    middleware,
     response::{IntoResponse, Response},
     routing::post,
     Form, Json, Router,
 };
 use tracing::{instrument, warn};
 
-use crate::{models::machines::Dropper, state::AppStateManager};
+use crate::{models::machines::Dropper, sessions, state::AppStateManager};
 
 pub fn merge_routes(app_state: AppStateManager) -> Router {
     Router::new()
-        .route("/register", post(register_dropper))
+        .route(
+            "/register",
+            post(register_dropper).route_layer(middleware::from_fn_with_state(
+                app_state.clone(),
+                sessions::middleware::authenticated,
+            )),
+        )
         .with_state(app_state)
 }
 
