@@ -10,6 +10,7 @@ use crate::models::users::{User, UserSession};
 pub mod auth;
 /// All axum trait implementation, for a session struct, is located in this file.
 mod axum_impls;
+pub mod middleware;
 
 pub const SESSION_COOKIE_NAME: &'static str = "SESSION";
 
@@ -27,12 +28,10 @@ pub enum SessionError {
     NoSessionForGivenId,
     #[error("Falha ao criar sessão")]
     FailedToCreateSession,
-    #[error("Erro ao tentar extender a sessão do utilizador")]
+    #[error("Ao tentar extender a sessão do utilizador")]
     FailedToExtendUserSession,
-    #[error("Erro ao tentar excluir a sessão do utilizador")]
+    #[error("Ao tentar excluir a sessão do utilizador")]
     FailedToDeleteUserSession,
-    #[error("Sessão já existente para este utilizador")]
-    AlreadyExistingSession,
 }
 
 impl SessionManager {
@@ -57,7 +56,8 @@ impl SessionManager {
         match query_result.unwrap_err() {
             sqlx::Error::Database(err) if err.is_unique_violation() => {
                 // Need to create_new_session
-                info!("Creating new session");
+                info!("Dropping old session, and creating anew");
+
                 Self::drop_session(pg_pool, user.id().unwrap()).await?;
 
                 let query_result = sqlx::query!(
@@ -140,22 +140,41 @@ impl SessionManager {
             return Ok(false);
         }
 
-        // Defaults to 20 more minutes in current session
-        // user_sesh.extend_session(None);
-
-        // sqlx::query!(
-        //     r#"UPDATE "user_session" set expires_in = $1 where user_id = $2;"#,
-        //     user_sesh.expires_in(),
-        //     user_sesh.id(),
-        // )
-        // .execute(pg_pool)
-        // .await
-        // .map_err(|err| {
-        //     warn!("Possible DB error: {err}");
-        //     SessionError::FailedToExtendUserSession
-        // })?;
-
         Ok(true)
+    }
+
+    pub async fn extend_session(
+        pg_pool: &sqlx::postgres::PgPool,
+        session_id: uuid::Uuid,
+    ) -> Result<()> {
+        let mut user_sesh = sqlx::query_as!(
+            UserSession,
+            r#"SELECT * FROM user_session WHERE id = $1"#,
+            session_id
+        )
+        .fetch_one(pg_pool)
+        .await
+        .map_err(|err| {
+            warn!("Possible DB error: {err}");
+            SessionError::NoSessionForGivenId
+        })?;
+
+        // Defaults to 20 more minutes in current session
+        user_sesh.extend_session(None);
+
+        sqlx::query!(
+            r#"UPDATE "user_session" set expires_in = $1 where user_id = $2;"#,
+            user_sesh.expires_in(),
+            user_sesh.id(),
+        )
+        .execute(pg_pool)
+        .await
+        .map_err(|err| {
+            warn!("Possible DB error: {err}");
+            SessionError::FailedToExtendUserSession
+        })?;
+
+        Ok(())
     }
 }
 
