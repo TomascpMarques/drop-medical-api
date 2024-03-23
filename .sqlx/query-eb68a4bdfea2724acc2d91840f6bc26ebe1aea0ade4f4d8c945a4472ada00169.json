@@ -11,8 +11,8 @@
     ],
     "parameters": {
       "Left": [
-        "Text",
-        "Text",
+        "Varchar",
+        "Varchar",
         "Text"
       ]
     },

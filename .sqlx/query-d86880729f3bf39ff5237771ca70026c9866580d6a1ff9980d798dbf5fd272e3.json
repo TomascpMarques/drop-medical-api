@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "select * from user_session where id = $1",
+  "query": "SELECT * FROM user_session WHERE id = $1",
   "describe": {
     "columns": [
       {
@@ -30,5 +30,5 @@
       false
     ]
   },
-  "hash": "2ef14a3849a13e60a6784c239dcefd982bbe5a1147c0ae5e0d2d42602da24255"
+  "hash": "d86880729f3bf39ff5237771ca70026c9866580d6a1ff9980d798dbf5fd272e3"
 }
