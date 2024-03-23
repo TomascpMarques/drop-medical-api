@@ -1,3 +1,12 @@
+# Starts the dev loop
+dev-loop: 
+  bash ./database/scripts/renew_db.sh; \
+  export APP_ENV=local && \
+  cargo watch -x check \
+    -x clippy \
+    -x "test -- --nocapture" \
+    -x "test -- --ignored" \
+
 # Start the Postgre docker container
 init-db:
   bash ./database/scripts/init_db.sh
@@ -10,6 +19,10 @@ clean-db:
 # Resume (must exist) the Postgre container
 resume-db:
   docker start dropmedical_pg
+
+# Connect to the development database 
+psql:
+  psql -h localhost -U postgres -p 2345 -d main
 
 # Run migrations using sqlx (local)
 migrate-db:
