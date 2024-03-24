@@ -1,7 +1,11 @@
+use std::collections::HashMap;
+
 use drop_medical_api::{
     configuration::{self, Settings},
     database, setup_app_router,
 };
+
+use once_cell::sync::Lazy;
 use reqwest::StatusCode;
 use serde_json::json;
 use sqlx::PgPool;
@@ -13,15 +17,19 @@ pub struct TestApp {
     address: String,
 }
 
+static TRACING: Lazy<()> = Lazy::new(|| {
+    // Server tracing
+    tracing_subscriber::fmt()
+        .with_target(false)
+        .compact()
+        .init();
+});
+
 #[tokio::test]
 async fn register_user() {
-    // Arrange connections
-    let config = configuration::get_config().unwrap();
-    let db_pool = configure_database(&config).await;
-    let test_app = spawn_app(config, &db_pool).await;
+    let test_app = spawn_app().await;
 
     let address = format!("http://{}/api/users/register", test_app.address());
-    dbg!(&address);
     let client = reqwest::Client::new();
 
     let reg_json = json!({
@@ -41,29 +49,128 @@ async fn register_user() {
     assert_eq!(req.content_length(), Some(0));
 }
 
-async fn spawn_app(config: Settings, db_pool: &PgPool) -> TestApp {
-    // Server tracing
-    tracing_subscriber::fmt()
-        .with_target(false)
-        .compact()
-        .init();
+#[tokio::test]
+async fn login_user() {
+    let test_app = spawn_app().await;
+
+    let address = format!("http://{}/api/users/register", test_app.address());
+    let client = reqwest::Client::builder()
+        .cookie_store(true)
+        .build()
+        .expect("Failed to setup cookie store for reqwest in login_user.");
+
+    let reg_json = json!({
+        "name": "John Doe",
+        "email": "john.doe@e.mail.com",
+        "password": "super_secret"
+    });
+
+    let req = client
+        .post(address.as_str())
+        .json(&reg_json)
+        .send()
+        .await
+        .expect("Failed to execute request");
+
+    assert_eq!(req.status(), StatusCode::OK);
+    assert_eq!(req.content_length(), Some(0));
+    assert!(req.headers().get("set-cookie").is_some());
+
+    let address = format!("http://{}/api/users/login", test_app.address());
+
+    let mut params = HashMap::new();
+    params.insert("email", "john.doe@e.mail.com");
+    params.insert("password", "super_secret");
+
+    let req = client
+        .post(address.as_str())
+        .form(&params)
+        .send()
+        .await
+        .expect("Failed to send login request");
+
+    assert_eq!(req.status(), StatusCode::OK);
+    assert_eq!(req.content_length(), Some(2));
+}
+
+#[tokio::test]
+async fn register_dropper() {
+    let test_app = spawn_app().await;
+
+    let address = format!("http://{}/api/users/register", test_app.address());
+    let client = reqwest::Client::builder()
+        .cookie_store(true)
+        .build()
+        .expect("Failed to setup cookie store for reqwest in login_user.");
+
+    let reg_json = json!({
+        "name": "John Doe",
+        "email": "john.doe@e.mail.com",
+        "password": "super_secret"
+    });
+
+    let req = client
+        .post(address.as_str())
+        .json(&reg_json)
+        .send()
+        .await
+        .expect("Failed to execute request");
+
+    assert_eq!(req.status(), StatusCode::OK);
+    assert_eq!(req.content_length(), Some(0));
+    assert!(req.headers().get("set-cookie").is_some());
+
+    let address = format!("http://{}/api/users/login", test_app.address());
+
+    let mut params = HashMap::new();
+    params.insert("email", "john.doe@e.mail.com");
+    params.insert("password", "super_secret");
+
+    let req = client
+        .post(address.as_str())
+        .form(&params)
+        .send()
+        .await
+        .expect("Failed to send login request");
+
+    assert_eq!(req.status(), StatusCode::OK);
+    assert_eq!(req.content_length(), Some(2));
+
+    let address = format!("http://{}/api/droppers/register", test_app.address());
+
+    let mut params = HashMap::new();
+    params.insert("n", "SupaDroper");
+
+    let req = client
+        .post(address.as_str())
+        .form(&params)
+        .send()
+        .await
+        .expect("Failed to send dropper register request");
+
+    dbg!(&req.headers());
+    dbg!(req.text().await.unwrap());
+    // assert_eq!(req.status(), StatusCode::OK);
+}
+
+async fn spawn_app() -> TestApp {
+    Lazy::force(&TRACING);
+
+    let config = configuration::get_config().unwrap();
+    let db_pool = configure_database(&config).await;
 
     // DB setup
-    let app = setup_app_router(db_pool).expect("Failed to setup app");
+    let app = setup_app_router(&db_pool).expect("Failed to setup app");
 
-    let address = format!(
-        "{}:{}",
-        config.application().host(),
-        config.application().port()
-    );
-
-    info!("Server listening on: http://{address}/");
-
-    let listener = tokio::net::TcpListener::bind(address.clone())
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
         .await
         .expect("Failed to bind address");
 
+    let address = format!("127.0.0.1:{}", listener.local_addr().unwrap().port());
+
     let _ = tokio::task::spawn(async { axum::serve(listener, app).await });
+
+    info!("Server listening on: http://{address}/");
 
     TestApp { address }
 }

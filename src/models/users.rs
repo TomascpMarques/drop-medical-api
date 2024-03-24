@@ -40,17 +40,17 @@ pub struct UserSession {
 }
 
 impl UserSession {
-    pub fn new(
-        id: uuid::Uuid,
-        user_id: uuid::Uuid,
-        expires_in: chrono::DateTime<chrono::Utc>,
-    ) -> Self {
-        Self {
-            id,
-            user_id,
-            expires_in,
-        }
-    }
+    // pub fn new(
+    //     id: uuid::Uuid,
+    //     user_id: uuid::Uuid,
+    //     expires_in: chrono::DateTime<chrono::Utc>,
+    // ) -> Self {
+    //     Self {
+    //         id,
+    //         user_id,
+    //         expires_in,
+    //     }
+    // }
 
     pub fn extend_session(&mut self, duration: Option<std::time::Duration>) {
         let duration = duration.unwrap_or(std::time::Duration::from_secs(60 * 20));

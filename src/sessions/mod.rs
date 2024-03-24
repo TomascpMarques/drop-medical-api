@@ -3,7 +3,7 @@ use tower_cookies::{
     cookie::time::{Duration, OffsetDateTime},
     Cookie, Cookies,
 };
-use tracing::{info, warn};
+use tracing::{error, info, warn};
 
 use crate::models::users::{User, UserSession};
 
@@ -32,6 +32,8 @@ pub enum SessionError {
     FailedToExtendUserSession,
     #[error("Ao tentar excluir a sessão do utilizador")]
     FailedToDeleteUserSession,
+    #[error("Could not get user's ID from user session")]
+    FailedToRetrieveUserIdFromSession,
 }
 
 impl SessionManager {
@@ -183,4 +185,21 @@ impl SessionManager {
 /// Extract the session id _([Uuid](uuid::Uuid) v4 value)_ from the session cookie.
 /// To achieve this it implements the trait [FromRequestParts](axum::extract::FromRequestParts)
 /// from the axum crate;
-struct UserSessionIdExtractor(uuid::Uuid);
+pub struct UserSessionIdExtractor(uuid::Uuid);
+
+impl UserSessionIdExtractor {
+    pub async fn get_user_id(&self, pg_pool: &sqlx::PgPool) -> Result<uuid::Uuid> {
+        let query_res = sqlx::query!(
+            r#"select user_id from "user_session" where id = $1"#,
+            self.0
+        )
+        .fetch_one(pg_pool)
+        .await
+        .map_err(|err| {
+            error!("Could not get user id from user's session id: {err}");
+            SessionError::FailedToRetrieveUserIdFromSession
+        })?;
+
+        Ok(query_res.user_id)
+    }
+}

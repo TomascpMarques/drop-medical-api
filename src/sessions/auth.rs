@@ -40,3 +40,5 @@ pub async fn authenticate_user<'a>(
 
     Ok(usr)
 }
+
+// TODO Log out user

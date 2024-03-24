@@ -1,0 +1,22 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "select user_id from \"user_session\" where id = $1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "user_id",
+        "type_info": "Uuid"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "d79e34ef7376d9198a9b86b45272e76f896d23d84dc6b9d2e923206ab520415a"
+}

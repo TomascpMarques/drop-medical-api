@@ -1,5 +1,5 @@
 # Starts the dev loop
-dev-loop: 
+dev: 
   bash ./database/scripts/renew_db.sh; \
   export APP_ENV=local && \
   cargo watch -x check \
@@ -35,6 +35,7 @@ migrate-new MIGRATION_NAME:
 # Prepare the off-line support for sqlx queries 
 sqlx-prepare:
   cargo sqlx prepare -- --workspace
+  cargo sqlx prepare -- --tests --workspace
 
 # Run the web-app in local mode
 run-prod:
