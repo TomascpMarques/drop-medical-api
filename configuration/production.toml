@@ -1,5 +1,6 @@
 [application]
 host = "0.0.0.0"
+port = 8080
 
 [database]
-uri = "postgresql://postgres:password@localhost/dropmedical"
+uri = "postgresql://main_owner:UCPrFZLN96lY@ep-royal-butterfly-a2lrqgcs-pooler.eu-central-1.aws.neon.tech/main?sslmode=require"

@@ -1,0 +1,9 @@
+.env
+.git
+justfile
+target/
+tests/
+Dockerfile
+scripts/
+migrations/
+database/

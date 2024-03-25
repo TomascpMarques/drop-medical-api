@@ -44,3 +44,11 @@ run-prod:
 # Run the web-app in production mode
 run-local:
   export APP_ENV=local && cargo r
+
+dk-build: sqlx-prepare
+  docker build --tag dropmedical --file Dockerfile .
+
+dk-run:
+  docker run -p 8080:8080 dropmedical
+
+dk-br: dk-build dk-run

@@ -1,13 +1,15 @@
 use crate::configuration::{Environment, Settings};
-use sqlx::postgres::PgPoolOptions;
+use sqlx::{postgres::PgConnectOptions, PgPool};
 
 pub async fn setup_db(config: &Settings) -> Result<sqlx::PgPool, sqlx::Error> {
     let db_uri = config.database().uri();
 
-    let pg_pool_options = PgPoolOptions::new().max_connections(5).min_connections(1);
+    let mut opts: PgConnectOptions = db_uri.parse()?;
+    opts = opts.ssl_mode(sqlx::postgres::PgSslMode::Require);
+
     match config.env() {
-        Environment::Local => pg_pool_options.connect(db_uri).await,
-        Environment::Production => pg_pool_options.connect_lazy(db_uri),
+        Environment::Local => PgPool::connect_with(opts.clone()).await,
+        Environment::Production => Ok(PgPool::connect_lazy_with(opts)),
     }
 }
 
