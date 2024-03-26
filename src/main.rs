@@ -38,6 +38,7 @@ async fn main() -> anyhow::Result<()> {
     let listener = tokio::net::TcpListener::bind(address)
         .await
         .context("Failed to bind listener")?;
+
     axum::serve(listener, app)
         .await
         .expect("Failed to run server");
